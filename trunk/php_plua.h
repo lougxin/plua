@@ -10,7 +10,7 @@
   | obtain it through the world-wide-web, please send a note to          |
   | license@php.net so we can mail you a copy immediately.               |
   +----------------------------------------------------------------------+
-  | Author: laruence@gmail.com                                           |
+  | Author: Laruence Hui        <laruence@gmail.com>                     |
   |         Johannes Schlueter  <johannes@php.net>                       |
   |         Marcelo  Araujo     <msaraujo@php.net>                       |
   |         Andreas Streichardt <andreas.streichardt@globalpark.com      |
