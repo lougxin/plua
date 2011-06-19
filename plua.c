@@ -16,7 +16,7 @@
   |             Andreas Streichardt <andreas.streichardt@globalpark.com> |
   +----------------------------------------------------------------------+
    $Id$
- */
+*/
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -28,7 +28,7 @@
 #include "lua.h"
 #include "php_plua.h"
 
-static int plua_st;
+static int le_plua_function;
 static zend_class_entry 	*plua_ce;
 static zend_object_handlers lua_object_handlers;
 
@@ -277,14 +277,19 @@ static zval * plua_get_zval_from_lua(lua_State *L, int index TSRMLS_DC) {
 				zval_ptr_dtor(&key);
 			}
 			break;
-		case LUA_TFUNCTION:
-			zend_list_insert((void *) 
+		case LUA_TFUNCTION: 
+			{
+				long ref_id = 0;
+				lua_pushvalue(L, index);
+				ref_id = luaL_ref(L, LUA_REGISTRYINDEX);
+				ZEND_REGISTER_RESOURCE(retval, (void *)ref_id, le_plua_function);
+			}
 			break;
 		case LUA_TUSERDATA:
 		case LUA_TTHREAD:
 		case LUA_TLIGHTUSERDATA:
 		default:
-			plua_warn("unsupported type '%s' for php", lua_typename(L, index));
+			plua_warn("unsupported type '%s' for php", lua_typename(L, lua_type(L, index)));
 	}
 
 	return retval;
@@ -454,9 +459,23 @@ static zval * plua_call_lua_function(lua_State *L, zval *func, zval *args, int u
 		lua_getfield(L, LUA_GLOBALSINDEX, Z_STRVAL_P(func));
 		if (LUA_TFUNCTION != lua_type(L, lua_gettop(L))) {
 			lua_pop(L, -1);
-			plua_warn("invalid lua callback '%s'", Z_STRVAL_P(func));
+			plua_warn("invalid lua function '%s'", Z_STRVAL_P(func));
 			return NULL;
 		}
+	} else if (IS_RESOURCE == Z_TYPE_P(func)) {
+		int * ref_id = NULL;
+		ZEND_FETCH_RESOURCE_NO_RETURN(ref_id, int *, &func, -1, PHP_PLUA_FUNCTION_RESOURCE_NAME, le_plua_function);
+		if (!ref_id) {
+			plua_warn("invalid lua function resource '%s'", zend_rsrc_list_get_rsrc_type(Z_LVAL_P(func) TSRMLS_CC));
+			return NULL;
+		}
+		bp = lua_gettop(L);
+		lua_rawgeti(L, LUA_REGISTRYINDEX, (long)ref_id);
+		if (LUA_TFUNCTION != lua_type(L, lua_gettop(L))) {
+			lua_pop(L, -1);
+			plua_warn("invalid lua function resource(%ld) of type (%s)", (long)ref_id, PHP_PLUA_FUNCTION_RESOURCE_NAME);
+			return NULL;
+		}   
 	}
 
 	if (use_self) {
@@ -587,7 +606,7 @@ PHP_METHOD(plua, include) {
 }
 /* }}} */
 
-/** {{{ proto PLua::__call(string $function, array $args) 
+/** {{{ proto PLua::__call(mixed $function, array $args) 
 */
 PHP_METHOD(plua, __call) {
 	long u_self = 0;
@@ -610,7 +629,7 @@ PHP_METHOD(plua, __call) {
 }
 /* }}} */
 
-/** {{{ proto PLua::call(string $function, array $args, bool $use_self) 
+/** {{{ proto PLua::call(mixed $function, array $args, bool $use_self) 
 */
 PHP_METHOD(plua, call) {
 	PHP_MN(plua___call)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
@@ -713,6 +732,8 @@ PHP_MINIT_FUNCTION(plua) {
 	memcpy(&lua_object_handlers, zend_get_std_object_handlers(), sizeof(zend_object_handlers));
 
 	plua_ce->ce_flags |= ZEND_ACC_FINAL;
+
+	le_plua_function = zend_register_list_destructors_ex(NULL, NULL, PHP_PLUA_FUNCTION_RESOURCE_NAME, module_number);
 
 	zend_declare_property_null(plua_ce, ZEND_STRL("_callbacks"), ZEND_ACC_STATIC | ZEND_ACC_PROTECTED TSRMLS_CC);
 
