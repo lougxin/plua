@@ -1,6 +1,6 @@
 /*
   +----------------------------------------------------------------------+
-  | PLua                                                                 |
+  | Lua                                                                  |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.01 of the PHP license,      |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -10,24 +10,24 @@
   | obtain it through the world-wide-web, please send a note to          |
   | license@php.net so we can mail you a copy immediately.               |
   +----------------------------------------------------------------------+
-  | Author: Laruence Hui        <laruence@gmail.com>                     |
-  |         Johannes Schlueter  <johannes@php.net>                       |
-  |         Marcelo  Araujo     <msaraujo@php.net>                       |
-  |         Andreas Streichardt <andreas.streichardt@globalpark.com      |
+  | Author    : Laruence            <laruence@gmail.com>                 |
+  | Thanks To : Johannes Schlueter  <johannes@php.net>                   |
+  |             Marcelo  Araujo     <msaraujo@php.net>                   |
+  |             Andreas Streichardt <andreas.streichardt@globalpark.com> |
   +----------------------------------------------------------------------+
-  $Id$ 
+   $Id$
  */
 
-#ifndef PHP_PLUA_H
-#define PHP_PLUA_H
+#ifndef PHP_LUA_H
+#define PHP_LUA_H
 
 extern zend_module_entry plua_module_entry;
 #define phpext_lua_ptr &lua_module_entry
 
 #ifdef PHP_WIN32
-#define PHP_PLUA_API __declspec(dllexport)
+#define PHP_LUA_API __declspec(dllexport)
 #else
-#define PHP_PLUA_API
+#define PHP_LUA_API
 #endif
 
 #include "lua.h"
@@ -56,6 +56,7 @@ PHP_METHOD(plua, __construct);
 PHP_METHOD(plua, eval);
 PHP_METHOD(plua, require);
 
+#define PHP_PLUA_FUNCTION_RESOURCE_NAME		"Lua Function"
 #define Z_LUAVAL_P(obj) ((php_plua_object*)(zend_object_store_get_object(obj)))->L
 
 #if defined(PHP_WIN32) && (_MSC_VER > 1400)
@@ -87,7 +88,7 @@ PHP_METHOD(plua, require);
 		php_error(E_NOTICE, format,  ##arg);
 #endif
 
-#endif	/* PHP_PLUA_H */
+#endif	/* PHP_LUA_H */
 
 
 /*
