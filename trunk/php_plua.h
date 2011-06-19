@@ -16,7 +16,7 @@
   |             Andreas Streichardt <andreas.streichardt@globalpark.com> |
   +----------------------------------------------------------------------+
    $Id$
- */
+*/
 
 #ifndef PHP_LUA_H
 #define PHP_LUA_H
