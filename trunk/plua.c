@@ -57,6 +57,10 @@ ZEND_END_ARG_INFO()
 ZEND_BEGIN_ARG_INFO_EX(arginfo_plua_eval, 0, 0, 1)
 	ZEND_ARG_INFO(0, statements)
 ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_plua_free, 0, 0, 1)
+	ZEND_ARG_INFO(0, closure)
+ZEND_END_ARG_INFO()
 /* }}} */
 
 /* {{{ lua_functions[]
@@ -137,11 +141,11 @@ static void plua_stack_dump(lua_State* L) {
 /** {{{ static int plua_atpanic(lua_State *L)
  */
 static int plua_atpanic(lua_State *L) { 
-  TSRMLS_FETCH();
-  plua_error("lua panic (%s)", lua_tostring(L, 1));
-  lua_pop(L, 1);
-  zend_bailout();
-  return 0;
+	TSRMLS_FETCH();
+	plua_error("lua panic (%s)", lua_tostring(L, 1));
+	lua_pop(L, 1);
+	zend_bailout();
+	return 0;
 } 
 /* }}} */
 
@@ -653,7 +657,7 @@ PHP_METHOD(plua, assign) {
 	plua_send_zval_to_lua(L, value TSRMLS_CC);
 	lua_setfield(L, LUA_GLOBALSINDEX, name);
 
-	RETURN_TRUE;
+	RETURN_ZVAL(getThis(), 1, 0);
 }
 /* }}} */
 
@@ -689,7 +693,35 @@ PHP_METHOD(plua, register) {
 	add_next_index_zval(callbacks, func);
 	zend_update_static_property(plua_ce, ZEND_STRL("_callbacks"), callbacks TSRMLS_CC);
 
-	RETURN_TRUE;
+	RETURN_ZVAL(getThis(), 1, 0);
+}
+/* }}} */
+
+/** {{{ proto PLua::free(resouce $lua_closure) 
+*/
+PHP_METHOD(plua, free) {
+	zval *closure = NULL;
+	lua_State *L  = NULL;
+	int  *ref_id  = NULL;
+
+	L = Z_LUAVAL_P(getThis());
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC,"r", &closure) == FAILURE) {
+		WRONG_PARAM_COUNT;
+	}
+
+	ZEND_FETCH_RESOURCE(ref_id, int *, &closure, -1, PHP_PLUA_FUNCTION_RESOURCE_NAME, le_plua_function);
+
+	luaL_unref(L, LUA_REGISTRYINDEX, (long)ref_id);
+
+	RETURN_ZVAL(getThis(), 1, 0);
+}
+/* }}} */
+
+/** {{{ proto Plua::getVersion() 
+*/
+PHP_METHOD(plua, getversion) {
+	RETURN_STRING(LUA_RELEASE, 1);
 }
 /* }}} */
 
@@ -716,6 +748,8 @@ zend_function_entry plua_class_methods[] = {
 	PHP_ME(plua, call,			arginfo_plua_call,  	ZEND_ACC_PUBLIC)
 	PHP_ME(plua, assign,		arginfo_plua_assign,	ZEND_ACC_PUBLIC)
 	PHP_ME(plua, register,		arginfo_plua_register, 	ZEND_ACC_PUBLIC)
+	PHP_ME(plua, free,			arginfo_plua_free, 		ZEND_ACC_PUBLIC)
+	PHP_ME(plua, getversion,	NULL, 					ZEND_ACC_PUBLIC|ZEND_ACC_ALLOW_STATIC)
 	{NULL, NULL, NULL}
 };
 /* }}} */
@@ -733,9 +767,10 @@ PHP_MINIT_FUNCTION(plua) {
 
 	plua_ce->ce_flags |= ZEND_ACC_FINAL;
 
-	le_plua_function = zend_register_list_destructors_ex(NULL, NULL, PHP_PLUA_FUNCTION_RESOURCE_NAME, module_number);
+	zend_declare_property_null(plua_ce, ZEND_STRL("_callbacks"), ZEND_ACC_STATIC|ZEND_ACC_PROTECTED TSRMLS_CC);
+	zend_declare_class_constant_string(plua_ce, ZEND_STRL("LUA_VERSION"), LUA_RELEASE TSRMLS_CC);
 
-	zend_declare_property_null(plua_ce, ZEND_STRL("_callbacks"), ZEND_ACC_STATIC | ZEND_ACC_PROTECTED TSRMLS_CC);
+	le_plua_function = zend_register_list_destructors_ex(NULL, NULL, PHP_PLUA_FUNCTION_RESOURCE_NAME, module_number);
 
 	return SUCCESS;
 }
