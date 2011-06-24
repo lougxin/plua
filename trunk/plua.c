@@ -99,6 +99,7 @@ ZEND_GET_MODULE(plua)
 /** {{{ function previos declare
  */
 static zval * plua_get_zval_from_lua(lua_State *L, int index TSRMLS_DC);
+static int plua_send_zval_to_lua(lua_State *L, zval *val TSRMLS_DC);
 /* }}} */
 
 /** {{{ static void plua_stack_dump(lua_State* L)
@@ -224,6 +225,71 @@ static zend_object_value plua_create_object(zend_class_entry *ce TSRMLS_DC) {
 
 	return obj;
 } 
+/* }}} */
+
+/** {{{ static zval *plua_read_property(zval *object, zval *member, int type TSRMLS_DC)
+*/
+static zval *plua_read_property(zval *object, zval *member, int type TSRMLS_DC) {
+	zval *retval 	 = NULL;
+	lua_State *L 	 = NULL;
+	zval *tmp_member = NULL;
+
+	if (type != BP_VAR_R) {
+		MAKE_STD_ZVAL(retval);
+		ZVAL_NULL(retval);
+		return retval;
+	}
+
+	if (Z_TYPE_P(member) != IS_STRING) {
+		ALLOC_ZVAL(tmp_member);
+		*tmp_member = *member;
+		INIT_PZVAL(tmp_member);
+		zval_copy_ctor(tmp_member);
+		convert_to_string(tmp_member);
+		member = tmp_member;
+	}
+
+	L = Z_LUAVAL_P(object);
+
+	lua_getfield(L, LUA_GLOBALSINDEX, Z_STRVAL_P(member) TSRMLS_CC);
+	retval = plua_get_zval_from_lua(L, -1 TSRMLS_CC);
+	Z_DELREF_P(retval);
+	lua_pop(L, 1);
+
+	if (tmp_member) {
+		zval_ptr_dtor(&tmp_member);
+	}
+
+	return retval;
+} 
+/* }}} */
+
+/** {{{ static void plua_write_property(zval *object, zval *member, zval *value TSRMLS_DC)
+*/
+static void plua_write_property(zval *object, zval *member, zval *value TSRMLS_DC) {
+	lua_State *L 	 = NULL;
+	zval *tmp_member = NULL;
+
+	if (Z_TYPE_P(member) != IS_STRING) {
+		ALLOC_ZVAL(tmp_member);
+		*tmp_member = *member;
+		INIT_PZVAL(tmp_member);
+		zval_copy_ctor(tmp_member);
+		convert_to_string(tmp_member);
+		member = tmp_member;
+	}
+
+	L = Z_LUAVAL_P(object);
+
+	plua_send_zval_to_lua(L, member TSRMLS_CC);
+	plua_send_zval_to_lua(L, value TSRMLS_CC);
+
+	lua_settable(L, LUA_GLOBALSINDEX);
+
+	if (tmp_member) {
+		zval_ptr_dtor(&tmp_member);
+	}
+}
 /* }}} */
 
 /** {{{ static zval * plua_get_zval_from_lua(lua_State *L, int index TSRMLS_DC)
@@ -764,6 +830,9 @@ PHP_MINIT_FUNCTION(plua) {
 	plua_ce = zend_register_internal_class(&ce TSRMLS_CC);
 	plua_ce->create_object = plua_create_object;
 	memcpy(&lua_object_handlers, zend_get_std_object_handlers(), sizeof(zend_object_handlers));
+
+	lua_object_handlers.write_property 	= plua_write_property;
+	lua_object_handlers.read_property	= plua_read_property;
 
 	plua_ce->ce_flags |= ZEND_ACC_FINAL;
 
