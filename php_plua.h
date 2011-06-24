@@ -30,6 +30,12 @@ extern zend_module_entry plua_module_entry;
 #define PHP_LUA_API
 #endif
 
+#if ((PHP_MAJOR_VERSION == 5) && (PHP_MINOR_VERSION < 3)) || (PHP_MAJOR_VERSION < 5)
+#define Z_ADDREF_P 	 ZVAL_ADDREF
+#define Z_REFCOUNT_P ZVAL_REFCOUNT
+#define Z_DELREF_P 	 ZVAL_DELREF
+#endif
+
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
